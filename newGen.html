@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+        body {
+            background-color: black;
+            color: white;
+            margin: 0;
+            padding: 0;
+        }
+
+        #items {
+            display: flex;
+        }
+
+        #panel-lewo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            float: left;
+            border-spacing: 0;
+            height: 90vh;
+            overflow-y: scroll;
+        }
+
+        #panel-prawo {
+            position: absolute;
+            left: 600px;
+            top: 26px;
+        }
+
+        #tabela-wyboru,
+        #plansza {
+            padding: 0;
+            border-spacing: 0;
+            border-collapse: collapse;
+        }
+
+        #plansza {
+            padding: 0;
+            border-spacing: 0;
+            border-collapse: collapse;
+        }
+
+        #tabela-wyboru canvas {
+            border: 1px solid white;
+            opacity: 0.5;
+        }
+
+        #plansza canvas {
+            border: 1px dotted lightgray;
+            opacity: 1;
+        }
+
+        #plansza .wybrano {
+            opacity: 0.5 !important;
+        }
+
+        #prostokat {
+            display: block;
+            width: 0px;
+            height: 0px;
+            background: aqua;
+            z-index: 999;
+            position: absolute;
+        }
+
+        #tlo {
+            position: absolute;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        #menu {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            top: 50%;
+            left: 50%;
+            width: 200px;
+            height: 500px;
+            background-color: silver;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+        }
+
+        #menu div {
+            justify-content: center;
+            display: flex;
+        }
+    </style>
+    <script>
+
+        class MapGenerator {
+            constructor(img, cItems, cPlansza, xPlanszy, yPlanszy) {
+                this.img = img;
+                this.wymiarCanvasaItems = cItems;
+                this.wymiarCanvasaPlansza = cPlansza;
+                this.xPlanszy = xPlanszy;
+                this.yPlanszy = yPlanszy;
+                this.control = false
+                this.automat = false
+                this.wybranePola = new Array()
+                this.wybranePolaProst = new Array()
+                this.elemPlanszy = new Array()
+                this.skopiowane = new Array()
+                this.krokiZmiany = new Array()
+                this.odkupienie = new Array()
+                this.tworzenieWyboru();
+                this.tworzeniePlanszy();
+                this.klaw()
+                this.menu()
+                this.obszar()
+            }
+            automatClick() {
+                this.automat = !this.automat
+            }
+            tworzenieWyboru() {
+                let tabela = document.getElementById("tabela-wyboru")
+                for (let y = 0; y < 20; y++) {
+                    let tr = document.createElement("tr")
+                    for (let x = 0; x < 16; x++) {
+                        let nowyElement = this.canvWyboru(x, y)
+                        let td = document.createElement("td")
+                        let ctx = nowyElement.getContext("2d")
+                        ctx.drawImage(this.img, 1 + (48 * x), 1 + (48 * y), 46, 46, 0, 0, this.wymiarCanvasaItems, this.wymiarCanvasaItems);
+                        td.appendChild(nowyElement)
+                        tr.appendChild(td)
+                    }
+                    tabela.appendChild(tr)
+                }
+                for (let y = 20; y < 40; y++) {
+                    let tr = document.createElement("tr")
+                    for (let x = 0; x < 16; x++) {
+                        let nowyElement = this.canvWyboru(x, y)
+                        let td = document.createElement("td")
+                        let plotno = nowyElement
+                        let ctx = plotno.getContext("2d");
+                        ctx.drawImage(this.img, 769 + (48 * x), 1 + (48 * (y - 20)), 46, 46, 0, 0, this.wymiarCanvasaItems, this.wymiarCanvasaItems);
+                        td.appendChild(plotno)
+                        tr.appendChild(td)
+                    }
+                    tabela.appendChild(tr)
+                }
+            }
+            tworzeniePlanszy() {
+                let plansza = document.getElementById("plansza")
+                for (let y = 0; y < this.yPlanszy; y++) {
+                    let tr = document.createElement("tr")
+                    let wiersz = []
+                    let elementy = []
+                    for (let x = 0; x < this.xPlanszy; x++) {
+                        let nowyElement = this.canvPlanszy(x, y)
+                        let td = document.createElement("td")
+                        let obj = new Object()
+                        td.appendChild(nowyElement)
+                        tr.appendChild(td)
+                        obj.element = nowyElement
+                        wiersz.push(obj)
+                        elementy.push(obj)
+                    }
+                    plansza.appendChild(tr)
+                    this.elemPlanszy.push(elementy)
+                }
+                this.elemPlanszy.forEach(e => {
+                    e.forEach(el => {
+                        el.dane = el.element.getBoundingClientRect()
+                    });
+                });
+            }//$0.parentElement.nextElementSibling.children[0].click()
+            canvWyboru(x, y) {
+                let canv = document.createElement("canvas")
+                canv.setAttribute("width", this.wymiarCanvasaItems)
+                canv.setAttribute("height", this.wymiarCanvasaItems)
+                canv.onclick = (e) => {
+                    if (this.wybranePola.length == 0) {
+                        alert("wybierz pole!")
+                    } else {
+                        let wyb = document.getElementsByClassName("wybrano");
+                        wyb = wyb[wyb.length - 1]
+                        let krok = []
+                        this.wybranePola.forEach((el) => {
+                            let ctx = el.getContext("2d")
+                            let imgSrc = el.toDataURL("image/jpeg", 1.0)
+                            ctx.drawImage(e.target, 0, 0, this.wymiarCanvasaItems, this.wymiarCanvasaItems, 0, 0, this.wymiarCanvasaPlansza, this.wymiarCanvasaPlansza);
+                            el.classList.remove("wybrano")
+                            let obj = {
+                                canv: el,
+                                img: imgSrc
+                            }
+                            krok.push(obj)
+                        })
+                        this.krokiZmiany.push(krok)
+                        this.odkupienie = []
+                        if (this.automat) {
+                            wyb.parentElement.nextElementSibling.children[0].click()
+                            this.wybranePola = []
+                            this.wybranePola.push(wyb.parentElement.nextElementSibling.children[0])
+                        } else {
+                            this.wybranePola = []
+                        }
+                    }
+                }
+                return canv;
+            }
+            canvPlanszy(x, y) {
+                let canv = document.createElement("canvas")
+                canv.setAttribute("width", this.wymiarCanvasaPlansza)
+                canv.setAttribute("height", this.wymiarCanvasaPlansza)
+                canv.onclick = (e) => {
+                    if (this.control) {
+                        e.target.classList.add("wybrano")
+                        if (this.wybranePola.indexOf(canv) == -1) {
+                            this.wybranePola.push(canv)
+                        }
+                    }
+                    else {
+                        let wybranePola = document.getElementsByClassName("wybrano")
+                        for (let i = wybranePola.length - 1; i >= 0; i--) {
+                            wybranePola[i].classList.remove("wybrano")
+                        };
+                        this.wybranePola = []
+                        this.wybranePola.push(canv)
+                        e.target.classList.add("wybrano")
+                    }
+                }
+                return canv;
+            }
+            klaw() {
+                document.addEventListener("keydown", (e) => {
+                    if (this.control && e.key == "c") {
+                        this.kopiuj(false)
+                    }
+                    if (this.control && e.key == "v") {
+                        this.wklej()
+                    }
+                    if (this.control && e.key == "x") {
+                        this.kopiuj(true)
+                    }
+                    if (this.control && e.key == "s") {
+                        e.preventDefault()
+                        this.zapisz()
+                    }
+                    if (this.control && e.key == "l") {
+                        e.preventDefault()
+                        this.odczytaj()
+                    }
+                    if (this.control && e.key == "z") {
+                        this.undo()
+                    }
+                    if (this.control && e.key == "y") {
+                        this.redo()
+                    }
+                    if (e.key == "Delete") {
+                        this.usun()
+                    }
+                    if (navigator.userAgent.includes("Macintosh")) {
+                        if (e.key == "Meta") {
+                            this.control = true
+                        }
+                    }
+                    else if (navigator.userAgent.includes("Windows")) {
+                        if (e.key == "Control") {
+                            this.control = true
+                        }
+                    }
+                })
+                document.addEventListener("keyup", (e) => {
+                    if (navigator.userAgent.includes("Macintosh")) {
+                        if (e.key == "Meta")
+                            this.control = false
+                    }
+                    else if (navigator.userAgent.includes("Windows")) {
+                        if (e.key == "Control")
+                            this.control = false
+                    }
+                })
+            }
+            menu() {
+                window.oncontextmenu = () => {
+                    if (document.getElementById("tlo") == null) {
+                        let tlo = document.createElement("div")
+                        tlo.id = "tlo"
+                        tlo.onclick = () => {
+                            document.body.removeChild(tlo)
+                            document.body.removeChild(document.getElementById("menu"))
+                        }
+                        document.body.appendChild(tlo)
+                    }
+                    if (document.getElementById("menu") == null) {
+                        let menu = document.createElement("div")
+                        menu.id = "menu"
+
+                        let kopiuj = document.createElement("div")
+                        kopiuj.innerHTML = "KOPIUJ - ctrl + c"
+                        kopiuj.onclick = () => {
+                            this.kopiuj(false)
+                            document.body.removeChild(tlo)
+                            document.body.removeChild(document.getElementById("menu"))
+                        }
+                        let wklej = document.createElement("div")
+                        wklej.innerHTML = "WKLEJ - ctrl + v"
+                        wklej.onclick = () => {
+                            this.wklej()
+                            document.body.removeChild(tlo)
+                            document.body.removeChild(document.getElementById("menu"))
+                        }
+                        let wytnij = document.createElement("div")
+                        wytnij.innerHTML = "WYTNIJ - ctrl + x"
+                        wytnij.onclick = () => {
+                            this.kopiuj(true)
+                            document.body.removeChild(tlo)
+                            document.body.removeChild(document.getElementById("menu"))
+                        }
+                        let usun = document.createElement("div")
+                        usun.innerHTML = "USUŃ - delete"
+                        usun.onclick = () => {
+                            this.usun()
+                            document.body.removeChild(tlo)
+                            document.body.removeChild(document.getElementById("menu"))
+                        }
+                        let zapisz = document.createElement("div")
+                        zapisz.innerHTML = "ZAPISZ - ctrl + s"
+                        zapisz.onclick = () => {
+                            this.zapisz()
+                            document.body.removeChild(tlo)
+                            document.body.removeChild(document.getElementById("menu"))
+                        }
+                        let wczytaj = document.createElement("div")
+                        wczytaj.innerHTML = "WCZYTAJ - ctrl + l"
+                        wczytaj.onclick = () => {
+                            this.odczytaj()
+                            document.body.removeChild(tlo)
+                            document.body.removeChild(document.getElementById("menu"))
+                        }
+                        let undo = document.createElement("div")
+                        undo.innerHTML = "UNDO - ctrl + z"
+                        undo.onclick = () => {
+                            this.undo()
+                            document.body.removeChild(tlo)
+                            document.body.removeChild(document.getElementById("menu"))
+                        }
+                        let redo = document.createElement("div")
+                        redo.innerHTML = "REDO - ctrl + y"
+                        redo.onclick = () => {
+                            this.redo()
+                            document.body.removeChild(tlo)
+                            document.body.removeChild(document.getElementById("menu"))
+                        }
+                        menu.appendChild(kopiuj)
+                        menu.appendChild(wytnij)
+                        menu.appendChild(wklej)
+                        menu.appendChild(usun)
+                        menu.appendChild(zapisz)
+                        menu.appendChild(wczytaj)
+                        menu.appendChild(undo)
+                        menu.appendChild(redo)
+
+                        document.body.appendChild(menu)
+                    }
+                    return false;
+                }
+            }
+            obszar() {
+                let plansza = document.getElementById("plansza")
+                let pr = document.createElement("div")
+                let mDown = false
+                let mMove = false
+                let top = 0
+                let left = 0
+                let prostokat
+                pr.id = "prostokat"
+                plansza.onmousedown = (e) => {
+                    if (!this.control) {
+                        let wybranePola = document.getElementsByClassName("wybrano")
+                        for (let i = wybranePola.length - 1; i >= 0; i--) {
+                            wybranePola[i].classList.remove("wybrano")
+                        }
+                    }
+                    pr.style.top = e.pageY + "px"
+                    pr.style.left = e.pageX + "px"
+                    pr.style.width = "0px"
+                    pr.style.height = "0px"
+                    left = e.pageX
+                    top = e.pageY
+                    mDown = true
+                    mMove = false
+                    document.body.appendChild(pr)
+                }
+                document.onmousemove = (e) => {
+                    if (mDown && mMove && Math.abs(e.pageX - left) > 16 && Math.abs(e.pageY - top) > 16) {
+                        prostokat = document.getElementById("prostokat")
+                        if (top >= e.pageY) {
+                            pr.style.top = e.pageY + "px"
+                        } else if (top <= e.pageY) {
+                            pr.style.top = top + "px"
+                        }
+                        if (left >= e.pageX) {
+                            pr.style.left = e.pageX + "px"
+                        } else if (left <= e.pageX) {
+                            pr.style.left = left + "px"
+                        }
+                        pr.style.width = Math.abs(e.pageX - left) + "px"
+                        pr.style.height = Math.abs(e.pageY - top) + "px"
+                        let obj = pr.getBoundingClientRect()
+                        this.szukajElementu(obj.y + obj.height, obj.x + obj.width, obj.top, obj.left)
+                    }
+                    else if (mDown && Math.abs(e.pageX - left) > 16 && Math.abs(e.pageY - top) > 16) {
+                        mMove = true
+                    }
+                }
+                document.onmouseup = (e) => {
+                    if (mDown && mMove) {
+                        if (this.control) {
+                            this.wybranePolaProst.forEach(e => {
+                                this.wybranePola.push(e)
+                            });
+                        } else {
+                            this.wybranePola = this.wybranePolaProst
+                        }
+                        this.wybranePolaProst = []
+                        document.body.removeChild(pr)
+                    }
+                    mMove = false
+                    mDown = false
+                }
+            }
+            szukajElementu(topKon, leftKon, topPocz, leftPocz) {
+                let topK = parseInt(topKon)
+                let leftK = parseInt(leftKon)
+                let topP = parseInt(topPocz)
+                let leftP = parseInt(leftPocz)
+                this.elemPlanszy.forEach(e => {
+                    e.forEach(el => {
+                        if (topK > el.dane.top && topP < (el.dane.top + 32) && leftK > el.dane.left && leftP < (el.dane.left + 32)) {
+                            //if (this.wybranePola.indexOf(el.element) == -1) {
+                            this.click(el.element)
+                            //}
+                        } else {
+                            this.unclick(el.element)
+                        }
+                    })
+                })
+            }
+            click(element) {
+                if (this.wybranePolaProst.indexOf(element) == -1) {
+                    element.classList.add("wybrano")
+                    this.wybranePolaProst.push(element)
+                }
+            }
+            unclick(element) {
+                if (this.wybranePolaProst.indexOf(element) != -1) {
+                    element.classList.remove("wybrano")
+                    this.wybranePolaProst.splice(this.wybranePolaProst.indexOf(element), 1)
+                }
+            }
+            usun() {
+                this.wybranePola.forEach((el) => {
+                    let ctx = el.getContext("2d")
+                    ctx.drawImage(this.img, 2, 2, 2, 2, 0, 0, this.wymiarCanvasaPlansza, this.wymiarCanvasaPlansza);
+                    el.classList.remove("wybrano")
+                })
+            }
+            kopiuj(czyUsun) {
+                this.skopiowane = []
+                if (this.wybranePola.length == 0) {
+                    alert("wybierz pola!")
+                } else {
+                    this.wybranePola.forEach((el) => {
+                        el.classList.remove("wybrano")
+                        let image = el.toDataURL("image/jpeg", 1.0)
+                        let td = el.parentElement
+                        let tr = el.parentElement.parentElement
+                        let table = document.getElementById("plansza")
+                        let obj = {
+                            img: image,
+                            x: this.szukajIndex(tr.children, td),
+                            y: this.szukajIndex(table.children, tr)
+                        }
+                        this.skopiowane.push(obj)
+                    })
+                    console.log(czyUsun)
+                    if (czyUsun == true) {
+                        this.usun()
+                    }
+                    let pierwszy = this.skopiowane[0]
+                    const pX = pierwszy.x
+                    const pY = pierwszy.y
+                    this.skopiowane.forEach(e => {
+                        e.x = e.x - pX
+                        e.y = e.y - pY
+                    })
+                    console.log(this.skopiowane)
+                    this.wybranePola = []
+                }
+            }
+            wklej() {
+                let startWklejania = this.wybranePola[0]
+                if (startWklejania == undefined) {
+                    alert("wybierz początek wklejania - naciśnij na element")
+                } else if (this.skopiowane.length == 0) {
+                    alert("Skopiuj elementy!")
+                } else {
+                    let td = startWklejania.parentElement
+                    let tr = startWklejania.parentElement.parentElement
+                    let table = document.getElementById("plansza")
+                    let xSt = this.szukajIndex(tr.children, td)
+                    let ySt = this.szukajIndex(table.children, tr)
+                    this.skopiowane.forEach(e => {
+                        let ctx = table.children[e.y + ySt].children[e.x + xSt].firstChild.getContext("2d")
+                        let img = new Image()
+                        img.src = e.img
+                        img.onload = () => {
+                            ctx.drawImage(img, 0, 0);
+                        }
+                        table.children[e.y + ySt].children[e.x + xSt].firstChild
+                    })
+                }
+            }
+            zapisz() {
+                let doZapisu = {
+                    tab: new Array()
+                }
+                let table = document.getElementById("plansza")
+                for (let y = 0; y < table.children.length; y++) {
+                    let tr = table.children[y]
+                    let wiersz = new Array()
+                    for (let x = 0; x < tr.children.length; x++) {
+                        let canv = tr.children[x].children[0]
+                        let image = canv.toDataURL("image/jpeg", 0.75)
+                        let obj = {
+                            img: image,
+                            x: x,
+                            y: y
+                        }
+                        wiersz.push(obj)
+                    }
+                    doZapisu.tab.push(wiersz)
+                }
+                // create the text file as a Blob:
+                var blob = new Blob([JSON.stringify(doZapisu)], { type: "text/plain" });
+                // download the file:
+                download(blob, "pacManMapa.js");
+                function download(blob, name) {
+                    var url = URL.createObjectURL(blob),
+                        div = document.createElement("div"),
+                        anch = document.createElement("a");
+                    document.body.appendChild(div);
+                    div.appendChild(anch);
+                    anch.innerHTML = "&nbsp;";
+                    div.style.width = "0";
+                    div.style.height = "0";
+                    anch.href = url;
+                    anch.download = name;
+
+                    var ev = new MouseEvent("click", {});
+                    anch.dispatchEvent(ev);
+                    document.body.removeChild(div);
+                }
+            }
+            odczytaj() {
+                let inputFile = document.getElementById("input-file")
+                inputFile.onchange = () => {
+                    let file = inputFile.files[0]
+                    if (file) {
+                        getAsText(file);
+                    }
+                }
+                function getAsText(readFile) {
+                    var reader = new FileReader();
+                    reader.readAsText(readFile, "UTF-8");
+                    reader.onload = loaded;
+                    reader.onerror = errorHandler;
+                }
+                function loaded(evt) {
+                    let fileString = evt.target.result;
+                    let dane = JSON.parse(fileString)
+                    let trs = document.getElementById("plansza").children
+                    for (let i = 0; i < trs.length; i++) {
+                        let tds = trs[i].children
+                        for (let j = 0; j < tds.length; j++) {
+                            let canv = tds[j].children[0]
+                            let ctx = canv.getContext("2d")
+                            let imgSrc = dane.tab[i][j].img
+                            let img = new Image()
+                            img.src = imgSrc
+                            img.onload = () => {
+                                ctx.drawImage(img, 0, 0);
+                            }
+                        }
+                    }
+                }
+
+                function errorHandler(evt) {
+                    if (evt.target.error.name == "NotReadableError") {
+                        alert("Plik nie mógł zostać załadowany")
+                    }
+                }
+                inputFile.click()
+            }
+            undo() {
+                if (this.krokiZmiany[this.krokiZmiany.length - 1] != undefined) {
+                    let odKrok = []
+                    this.krokiZmiany[this.krokiZmiany.length - 1].forEach(e => {
+                        let imgSrc = e.canv.toDataURL("image/jpeg", 1.0)
+                        let obj = {
+                            canv: e.canv,
+                            img: imgSrc
+                        }
+                        odKrok.push(obj)
+                        let img = new Image()
+                        img.src = e.img
+                        let ctx = e.canv.getContext("2d")
+                        img.onload = () => {
+                            ctx.drawImage(img, 0, 0)
+                        }
+                    })
+                    this.krokiZmiany.pop()
+                    this.odkupienie.push(odKrok)
+                } else {
+                    alert("Nie ma na co cofnąć!")
+                }
+            }
+            redo() {
+                if (this.odkupienie[this.odkupienie.length - 1] != undefined) {
+                    let odKrok = []
+                    this.odkupienie[this.odkupienie.length - 1].forEach(e => {
+                        let imgSrc = e.canv.toDataURL("image/jpeg", 1.0)
+                        let obj = {
+                            canv: e.canv,
+                            img: imgSrc
+                        }
+                        odKrok.push(obj)
+                        let img = new Image()
+                        img.src = e.img
+                        let ctx = e.canv.getContext("2d")
+                        img.onload = () => {
+                            ctx.drawImage(img, 0, 0)
+                        }
+                    })
+                    this.odkupienie.pop()
+                    this.krokiZmiany.push(odKrok)
+                } else {
+                    alert("Nie ma do czego przywrócić!")
+                }
+            }
+            szukajIndex(HTMLcoll, elem) {
+                for (let i = 0; i < HTMLcoll.length; i++) {
+                    if (HTMLcoll[i] === elem) {
+                        return i
+                    }
+                }
+            }
+        }
+        const source = 'sprite/sprites2.png'
+        window.addEventListener("DOMContentLoaded", (event) => {
+            let imageObj = new Image();
+            imageObj.src = source;
+            imageObj.onload = function () {
+                game = new MapGenerator(this, 30, 30, 20, 20);
+            };
+        })
+    </script>
+</head>
+
+<body>
+    <div id="panel-lewo">
+        <span id="items">Items</span>
+        <table id="tabela-wyboru">
+        </table>
+    </div>
+    <div id="panel-prawo">
+        <span>
+            automat:<input type="checkbox" onchange="game.automatClick()">
+        </span>
+        <table id="plansza">
+        </table>
+    </div>
+    <input type="file" style="display: none;" id="input-file">
+</body>
+
+</html>
